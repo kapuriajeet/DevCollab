@@ -5,9 +5,9 @@ import cookieParser from "cookie-parser";
 
 import mongodbConnection from "./db/connection.js";
 
-
 import authRoutes from "./routes/auth.js";
-import profileRoutes from './routes/userProfile.js';
+import profileRoutes from "./routes/userProfile.js";
+import postRoutes from "./routes/posts.js";
 
 const app = express();
 
@@ -20,7 +20,6 @@ app.use(
 );
 app.use(express.json());
 
-
 const PORT = process.env.PORT;
 mongodbConnection;
 
@@ -30,6 +29,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", profileRoutes);
+app.use("/api/v1/posts", postRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on PORT ${PORT}`);
