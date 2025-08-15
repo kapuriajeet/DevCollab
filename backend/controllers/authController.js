@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import { User } from "../models/User.js";
+import User from "../models/User.js";
+import Blacklist from "../models/BlacklistToken.js";
 import { hashPassword } from "../utils/hashPassword.js";
 
 export const registerController = async (req, res) => {
@@ -61,18 +62,13 @@ export const loginController = async (req, res) => {
       expiresIn: "7d",
     });
     user.password = undefined;
-    res.cookie("token", token, {
-      httpOnly: true,
-      // secure: true,
-      sameSite: "strict",
-    });
+    console.log("User Loggedin successfully!");
 
     res.status(200).json({
       success: true,
       token: token,
       user,
     });
-    
   } catch (error) {
     console.log(`Error while creating logging in user: ${error}`);
     return res.status(500).json({
@@ -85,7 +81,9 @@ export const loginController = async (req, res) => {
 export const deleteController = async (req, res) => {
   try {
     const userId = req.params.id;
-
+    const token = req.headers.authorization.split(" ")[1];
+    console.log("Inside delete Controller: ", token);
+    await new Blacklist({ token }).save();
     const deletedUser = await User.findByIdAndDelete(userId).exec();
 
     if (!deletedUser)
@@ -108,9 +106,8 @@ export const deleteController = async (req, res) => {
 
 export const logoutController = async (req, res) => {
   try {
-    res.clearCookie("token", {
-      httpOnly: true,
-    });
+    const token = req.headers.authorization.split(" ")[1];
+    await new Blacklist({ token }).save();
 
     return res.status(200).json({
       success: true,

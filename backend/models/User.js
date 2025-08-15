@@ -7,14 +7,14 @@ const UserSchema = new mongoose.Schema(
     password: { type: String },
     authProvider: {
       type: String,
-      enum: ["local", "google", "github"],
+      enum: ["local", "google"],
       default: "local",
     },
     googleId: { type: String },
-    githubId: { type: String },
     profile: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile" },
   },
   { timestamps: true }
 );
 
-export const  User = mongoose.model("User", UserSchema);
+const  User = mongoose.model("User", UserSchema);
+export default User;
