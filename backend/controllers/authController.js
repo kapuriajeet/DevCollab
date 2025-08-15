@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import User from "../models/User.js";
 import Blacklist from "../models/BlacklistToken.js";
 import { hashPassword } from "../utils/hashPassword.js";
+import UserProfile from "../models/UserProfile.js";
 
 export const registerController = async (req, res) => {
   try {
@@ -21,10 +22,23 @@ export const registerController = async (req, res) => {
 
     const hashedPassword = await hashPassword(password);
 
+    const profile = new UserProfile({
+        username: name,
+        avatar: "",
+        skills: [],
+        address: "",
+        bio: "",
+        socialLinks: {},
+        followers: [],
+        following: []
+      });
+    
+    await profile.save();
     const user = new User({
       name,
       email,
       password: hashedPassword,
+      profile: profile._id
     });
 
     await user.save();

@@ -7,6 +7,7 @@ import mongodbConnection from "./db/connection.js";
 
 
 import authRoutes from "./routes/auth.js";
+import profileRoutes from './routes/userProfile.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", profileRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on PORT ${PORT}`);
