@@ -1,8 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-
-import authRoutes from "./routers/auth.js";
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/auth.js";
 import mongodbConnection from "./db/connection.js";
 const app = express();
 app.use(cors({
@@ -11,6 +11,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());
 const PORT = process.env.PORT;
 
 mongodbConnection;
