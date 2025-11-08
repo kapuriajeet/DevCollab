@@ -23,22 +23,22 @@ export const registerController = async (req, res) => {
     const hashedPassword = await hashPassword(password);
 
     const profile = new UserProfile({
-        username: name,
-        avatar: "",
-        skills: [],
-        address: "",
-        bio: "",
-        socialLinks: {},
-        followers: [],
-        following: []
-      });
-    
+      username: name,
+      avatar: "",
+      skills: [],
+      address: "",
+      bio: "",
+      socialLinks: {},
+      followers: [],
+      following: [],
+    });
+
     await profile.save();
     const user = new User({
       name,
       email,
       password: hashedPassword,
-      profile: profile._id
+      profile: profile._id,
     });
 
     await user.save();
@@ -66,7 +66,7 @@ export const loginController = async (req, res) => {
         .status(400)
         .json({ success: false, message: "No user found with this email id." });
 
-    const match = await bcrypt.compare(password, user.password);
+    const match = bcrypt.compare(password, user.password);
     if (!match)
       return res
         .status(400)
@@ -99,7 +99,7 @@ export const deleteController = async (req, res) => {
     console.log("Inside delete Controller: ", token);
     await new Blacklist({ token }).save();
     const deletedUser = await User.findByIdAndDelete(userId).exec();
-
+    // const deletedProfile = await.UserProfile.findByIdAndDelete()
     if (!deletedUser)
       return res
         .status(404)

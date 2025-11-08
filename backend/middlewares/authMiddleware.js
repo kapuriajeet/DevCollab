@@ -4,7 +4,6 @@ import User from "../models/User.js";
 export const isAuthenticated = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log("AuthHeader", authHeader);
     const token = authHeader.split(" ")[1];
 
     const tokenExists = await Blacklist.findOne({ token }).exec();
@@ -20,7 +19,7 @@ export const isAuthenticated = async (req, res, next) => {
   } catch (error) {
     console.log(`Error occurred in Auth Middleware: ${error}`);
     res.status(500).json({
-      message: "Error occurred.",
+      message: "Not authorized to perform this task. Please log in.",
     });
   }
 };
