@@ -1,24 +1,31 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import User from "../models/User.js";
-import Blacklist from "../models/BlacklistToken.js";
 import { hashPassword } from "../utils/hashPassword.js";
 import UserProfile from "../models/UserProfile.js";
+
+
+const generateAccessToken = (userId) => {
+  jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "15m" });
+};
+
+const generateRefreshToken = (userId) => {
+  jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
+};
 
 export const registerController = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    if (!name) return res.status(400).json({ message: "Name is required" });
-    if (!email) return res.status(400).json({ message: "Email is required" });
-    if (!password || password.length < 6)
+    if (!name, !email, !password) return res.status(400).json({ message: "Name is required" });
+    if (password.length < 6)
       return res.status(400).json({ message: "Please enter a valid password" });
 
-    let userExists = await User.findOne({ email }).exec();
+    const userExists = await User.findOne({ email });
 
     if (userExists)
       return res
         .status(400)
-        .json({ success: false, message: "Email id is taken" });
+        .json({ success: false, message: "Email already in Use" });
 
     const hashedPassword = await hashPassword(password);
 
@@ -42,8 +49,8 @@ export const registerController = async (req, res) => {
     });
 
     await user.save();
-    console.log("User registered successfully!");
-    res.status(200).json({
+    console.log("User registered successfully!", user);
+    res.status(201).json({
       success: true,
       message: "User registered successfully!",
       user,
@@ -60,31 +67,61 @@ export const registerController = async (req, res) => {
 export const loginController = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email }).exec();
+    const user = await User.findOne({ email });
     if (!user)
       return res
         .status(400)
         .json({ success: false, message: "No user found with this email id." });
 
-    const match = bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(password, user.password);
     if (!match)
       return res
         .status(400)
         .json({ success: false, message: "Passwords doesn't match." });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-    user.password = undefined;
-    console.log("User Loggedin successfully!");
+    const refreshToken = generateRefreshToken(user._id);
+    const accessToken = generateAccessToken(user._id);
 
-    res.status(200).json({
+
+    user.refreshToken = refreshToken;
+    await user.save();
+    console.log("User Loggedin successfully!", user);
+
+    res.status(200).cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    }).json({
       success: true,
-      token: token,
+      message: "User Loggedin successfully!",
+      accessToken,
       user,
     });
   } catch (error) {
     console.log(`Error while creating logging in user: ${error}`);
+    return res.status(500).json({
+      success: false,
+      message: "Error while logging user in.",
+    });
+  }
+};
+
+export const refreshTokenController = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token) return res.status(401).json({ success: true, message: "No refresh token" });
+
+    const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(payload._id);
+
+    if (!user || user.refreshToken !== token)
+      return res.status(401).json({ success: true, message: "Invalid Refresh token" });
+    const newAccessToken = generateAccessToken(user._id);
+    res.json({
+      success: true, accessToken: newAccessToken
+    });
+  } catch (error) {
+    console.log(`Error in refresh token: ${error}`);
     return res.status(500).json({
       success: false,
       message: "Error while logging user in.",
@@ -98,8 +135,9 @@ export const deleteController = async (req, res) => {
     const token = req.headers.authorization.split(" ")[1];
     console.log("Inside delete Controller: ", token);
     await new Blacklist({ token }).save();
-    const deletedUser = await User.findByIdAndDelete(userId).exec();
-    // const deletedProfile = await.UserProfile.findByIdAndDelete()
+    const deletedUser = await User.findByIdAndDelete(userId);
+    const deletedProfile = await UserProfile.findByIdAndDelete();
+    console.log("Hello World");
     if (!deletedUser)
       return res
         .status(404)
@@ -120,18 +158,14 @@ export const deleteController = async (req, res) => {
 
 export const logoutController = async (req, res) => {
   try {
-    const token = req.headers.authorization.split(" ")[1];
-    await new Blacklist({ token }).save();
+    const token = req.cookies.refreshToken;
 
-    return res.status(200).json({
-      success: true,
-      message: "User Logged out successfully!",
-    });
+    if (token) {
+      const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      await User.findByIdAndUpdate(payload.id, { $unset: { refreshToken: 1 } });
+    }
+    res.clearCookie("refreshToken").json({ success: true, message: "Logged out" });
   } catch (error) {
-    console.log(`Error while logging out a user: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Error while logging out a user.",
-    });
+    res.clearCookie("refreshToken").json({ success: true, message: "Logged out" });
   }
 };
