@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-
 const UserProfileSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true },

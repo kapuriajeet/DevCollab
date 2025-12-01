@@ -128,7 +128,6 @@ export const deleteController = async (req, res) => {
   try {
     const userId = req.user._id;
     const userProfileId = req.user.profile;
-
     await UserProfile.findByIdAndDelete(userProfileId);
     await User.findByIdAndDelete(userId);
 
