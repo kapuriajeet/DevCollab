@@ -5,12 +5,10 @@ import { hashPassword } from "../utils/hashPassword.js";
 import UserProfile from "../models/UserProfile.js";
 
 
-const generateAccessToken = (userId) => {
-  jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "15m" });
-};
+const generateAccessToken = (userId) => jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "30m" });
 
 const generateRefreshToken = (userId) => {
-  jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
 };
 
 export const registerController = async (req, res) => {
@@ -49,7 +47,6 @@ export const registerController = async (req, res) => {
     });
 
     await user.save();
-    console.log("User registered successfully!", user);
     res.status(201).json({
       success: true,
       message: "User registered successfully!",
@@ -67,7 +64,7 @@ export const registerController = async (req, res) => {
 export const loginController = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate("profile");
     if (!user)
       return res
         .status(400)
@@ -81,11 +78,10 @@ export const loginController = async (req, res) => {
 
     const refreshToken = generateRefreshToken(user._id);
     const accessToken = generateAccessToken(user._id);
-
+    console.log("refreshToken", refreshToken);
 
     user.refreshToken = refreshToken;
     await user.save();
-    console.log("User Loggedin successfully!", user);
 
     res.status(200).cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -112,10 +108,9 @@ export const refreshTokenController = async (req, res) => {
     if (!token) return res.status(401).json({ success: true, message: "No refresh token" });
 
     const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findById(payload._id);
-
+    const user = await User.findById(payload.id);
     if (!user || user.refreshToken !== token)
-      return res.status(401).json({ success: true, message: "Invalid Refresh token" });
+      return res.status(401).json({ success: false, message: "Invalid Refresh token" });
     const newAccessToken = generateAccessToken(user._id);
     res.json({
       success: true, accessToken: newAccessToken
@@ -131,22 +126,16 @@ export const refreshTokenController = async (req, res) => {
 
 export const deleteController = async (req, res) => {
   try {
-    const userId = req.params.id;
-    const token = req.headers.authorization.split(" ")[1];
-    console.log("Inside delete Controller: ", token);
-    await new Blacklist({ token }).save();
-    const deletedUser = await User.findByIdAndDelete(userId);
-    const deletedProfile = await UserProfile.findByIdAndDelete();
-    console.log("Hello World");
-    if (!deletedUser)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+    const userId = req.user._id;
+    const userProfileId = req.user.profile;
 
-    return res.status(200).json({
-      success: true,
-      message: "User deleted successfully!",
-    });
+    await UserProfile.findByIdAndDelete(userProfileId);
+    await User.findByIdAndDelete(userId);
+
+    return res
+      .status(200)
+      .json({ success: true, message: "User Deleted successfully!" });
+
   } catch (error) {
     console.log(`Error while deleting a user: ${error}`);
     return res.status(500).json({

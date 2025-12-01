@@ -1,6 +1,7 @@
 import express from "express";
 import {
   followUser,
+  getCurrentUserProfile,
   getFollowers,
   getFollowing,
   getUserProfile,
@@ -9,25 +10,28 @@ import {
 } from "../controllers/userProfileController.js";
 import { isAuthenticated } from "../middlewares/authMiddleware.js";
 import upload from "../middlewares/multer.js";
+
 const router = express.Router();
 
-// GET Profile for each user by id
-router.get("/:userId", isAuthenticated, getUserProfile);
+// GET Current User profile
+router.get("/me", isAuthenticated, getCurrentUserProfile);
+// GET User Profile by Id
+router.get("/:profileId", getUserProfile);
 
-// PATCH Profile for each user
+// PATCH Update User Profile 
 router.patch(
-  "/:profileId",
+  "/me",
   isAuthenticated,
   upload.single("avatar"),
   updateUserProfile
 );
 
-// Follower User
+// Follow User
 router.patch("/:profileId/follow", isAuthenticated, followUser);
-// Unfollowe User
+// UnFollow User
 router.patch("/:profileId/unfollow", isAuthenticated, unfollowUser);
 // Getting Followers List
-router.get('/:profileId/followers', getFollowers)
+router.get('/:profileId/followers', getFollowers);
 // Getting Following List
-router.get('/:profileId/following', getFollowing)
+router.get('/:profileId/following', getFollowing);
 export default router;
