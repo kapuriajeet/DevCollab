@@ -8,6 +8,7 @@ import mongodbConnection from "./db/connection.js";
 import authRoutes from "./routes/auth.js";
 import profileRoutes from "./routes/userProfile.js";
 import postRoutes from "./routes/posts.js";
+import commentRoutes from "./routes/comment.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.get("/", (req, res) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", profileRoutes);
 app.use("/api/v1/posts", postRoutes);
+app.use("/api/v1/comments", commentRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on PORT ${PORT}`);

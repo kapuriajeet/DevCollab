@@ -65,22 +65,41 @@ export const createPost = async (req, res) => {
   }
 };
 
-
 export const getAllPosts = async (req, res) => {
   try {
-    const posts = await Post.find().populate("userProfile", "username avatar").sort({ createdAt: -1 }).lean();
-    if (!posts) return res.status(404).json({ success: false, message: "Post Not Found" });
-    return res.status(200).json({ success: true, message: "All Posts fetched successfully", posts });
-  } catch (error) {
-    console.log(`Error while creating a post: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while fetching post",
+    let { page = 1, limit = 10 } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    const skip = (page - 1) * limit;
+
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("user", "username avatar")
+      .populate("userProfile", "username avatar")
+      .lean();
+
+    const totalPosts = await Post.countDocuments();
+
+    return res.status(200).json({
+      success: true,
+      posts,
+      currentPage: page,
+      totalPages: Math.ceil(totalPosts / limit),
+      hasMore: page * limit < totalPosts,
     });
 
+  } catch (error) {
+    console.error("Error fetching paginated posts:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch posts",
+    });
   }
 };
-
 export const getLoggedInUserPosts = async (req, res) => {
   try {
     const userId = req.user._id;
