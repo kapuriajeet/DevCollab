@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 const UserProfileSchema = new mongoose.Schema(
   {
-    username: { type: String, required: true, unique: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
+    username: { type: String, required: true, unique: true, index: true },
     avatar: { type: String },
     skills: [{ type: String }],
     address: { type: String },
@@ -16,6 +17,11 @@ const UserProfileSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+
+// Indexes for performance
+UserProfileSchema.index({ followers: 1 });
+UserProfileSchema.index({ following: 1 });
 
 const UserProfile = mongoose.model("UserProfile", UserProfileSchema);
 

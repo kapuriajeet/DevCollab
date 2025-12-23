@@ -1,6 +1,5 @@
 import UserProfile from "../models/UserProfile.js";
-import cloudinary from "../config/cloudinary.js";
-
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 export const getCurrentUserProfile = async (req, res) => {
   try {
@@ -55,20 +54,9 @@ export const updateUserProfile = async (req, res) => {
 
     let avatarUrl;
 
-    if (req.file) {
-      const result = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder: "devcollab/avatars",
-            resource_type: "image",
-          },
-          (error, uploadedImage) => {
-            if (error) return reject(error);
-            resolve(uploadedImage);
-          }
-        );
-        stream.end(req.file.buffer);
-      });
+    const avatarLocalPath = req.files?.avatar[0]?.path;
+    if (avatarLocalPath) {
+      const result = await uploadOnCloudinary(avatarLocalPath, "avatar");
       avatarUrl = result.secure_url;
     }
 
@@ -177,8 +165,8 @@ export const unfollowUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Cannot unfollow yourself" });
 
     const isFollowing = await UserProfile.exists({
-      _id: currentUserId,
-      following: targetUserId,
+      _id: currentUserProfileId,
+      following: targetUserProfileId,
     });
 
     if (!isFollowing) {

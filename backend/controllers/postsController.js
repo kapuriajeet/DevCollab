@@ -1,5 +1,3 @@
-import mongoose from "mongoose";
-import cloudinary from "../config/cloudinary.js";
 import Post from "../models/Post.js";
 export const uploadMedia = async (req, res) => {
   try {
@@ -11,14 +9,22 @@ export const uploadMedia = async (req, res) => {
     const uploadedMedia = [];
     console.log("Req files", req.files);
     for (const file of req.files) {
-      const result = await cloudinary.uploader.upload(file.path, {
-
-        folder: "devcollab/posts",
-        resource_type: "auto",
-        transformation: [
-          { width: 1080, height: 1080, crop: "limit" },
-          { fetch_format: "auto", quality: "auto" },
-        ],
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: "devcollab/posts",
+            resource_type: "auto",
+            transformation: [
+              { width: 1080, height: 1080, crop: "limit" },
+              { fetch_format: "auto", quality: "auto" },
+            ],
+          },
+          (error, uploadedImage) => {
+            if (error) return reject(error);
+            resolve(uploadedImage);
+          }
+        );
+        stream.end(file.buffer);
       });
 
       uploadedMedia.push({
@@ -26,9 +32,9 @@ export const uploadMedia = async (req, res) => {
         publicId: result.public_id,
         type: file.mimetype.startsWith("video") ? "video" : "image"
       });
-
-      console.log("In uploadMedia", uploadedMedia);
     }
+
+    console.log("In uploadMedia", uploadedMedia);
 
     return res.status(200).json({ success: true, media: uploadedMedia });
   } catch (error) {
@@ -78,7 +84,6 @@ export const getAllPosts = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("user", "username avatar")
       .populate("userProfile", "username avatar")
       .lean();
 

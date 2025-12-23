@@ -1,24 +1,28 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-export const isAuthenticated = async (req, res, next) => {
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+export const isAuthenticated = asyncHandler(async (req, _, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer "))
-      return res.status(401).json({ message: "No token provided" });
+    const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
 
-    const token = authHeader.split(" ")[1];
+    console.log(token);
+    if (!token) {
+      throw new ApiError(401, "Unauthorized request");
+    }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-    const user = await User.findById(decoded.id).populate("profile");
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findById(decodedToken?._id).select("-password -refreshToken");
+
+    if (!user) {
+
+      throw new ApiError(401, "Invalid Access Token");
+    }
+
     req.user = user;
-    console.log("isAuthenticated: ", user);
     next();
   } catch (error) {
-    console.log(`Error occurred in Auth Middleware: ${error}`);
-    res.status(401).json({
-      message: "Not authorized to perform this task. Please log in.",
-    });
+    throw new ApiError(401, error?.message || "Invalid access token");
   }
-}; 
+});

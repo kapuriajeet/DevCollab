@@ -9,7 +9,7 @@ import {
   updateUserProfile,
 } from "../controllers/userProfileController.js";
 import { isAuthenticated } from "../middlewares/authMiddleware.js";
-import upload from "../middlewares/multer.js";
+import { upload } from "../middlewares/multer.js";
 
 const router = express.Router();
 

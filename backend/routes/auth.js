@@ -3,7 +3,8 @@ import { deleteController, loginController, logoutController, registerController
 import { isAuthenticated } from "../middlewares/authMiddleware.js";
 const router = express.Router();
 
-router.post("/register", registerController);
+// router.post("/register", registerController);
+router.route("/register").post(registerController);
 router.post("/login", loginController);
 router.post("/refresh", refreshTokenController);
 router.delete('/delete', isAuthenticated, deleteController);

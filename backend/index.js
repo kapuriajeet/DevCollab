@@ -1,40 +1,26 @@
 import "dotenv/config";
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
+import { mongoDBConnection } from "./db/connection.js";
+import { app } from './app.js';
+import { createServer } from "http";
+import { initializeSocket } from "./socket/socketServer.js";
 
-import mongodbConnection from "./db/connection.js";
+const PORT = process.env.PORT || 5000;
 
-import authRoutes from "./routes/auth.js";
-import profileRoutes from "./routes/userProfile.js";
-import postRoutes from "./routes/posts.js";
-import commentRoutes from "./routes/comment.js";
+const startServer = async () => {
+  try {
+    await mongoDBConnection();
 
-const app = express();
+    const httpServer = createServer(app);
+    initializeSocket(httpServer);
 
-app.use(express.json());
-app.use(cookieParser());
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
-app.use(express.json());
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Server running on PORT ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Server startup failed:", error);
+    process.exit(1);
+  }
+};
 
-const PORT = process.env.PORT;
-mongodbConnection;
+startServer();
 
-app.get("/", (req, res) => {
-  res.send("Hello World");
-});
-
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/users", profileRoutes);
-app.use("/api/v1/posts", postRoutes);
-app.use("/api/v1/comments", commentRoutes);
-
-app.listen(PORT, () => {
-  console.log(`Server is running on PORT ${PORT}`);
-});
