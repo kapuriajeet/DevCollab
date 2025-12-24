@@ -1,3 +1,0 @@
--- Todos
-1. Delete User Profile on deleting user account.
-

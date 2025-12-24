@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs, { existsSync } from 'fs';
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -15,14 +15,18 @@ const uploadOnCloudinary = async (filePath, folder) => {
 
     const response = await cloudinary.uploader.upload(filePath, {
       resource_type: "auto",
-      folder: folder
-
+      folder: folder,
+      transformation: [
+        { width: 1080, height: 1080, crop: "limit" },
+        { fetch_format: "auto", quality: "auto" },
+      ],
     });
 
-    console.log("file is uploaded on cloudinary", response.secure_url);
+    fs.unlinkSync(filePath);
     return response;
   } catch (err) {
-    fs.unlinkSync(filePath);
+    if (existsSync(filePath))
+      fs.unlinkSync(filePath);
     console.log("Error while uploading cloudinary");
     return null;
   }

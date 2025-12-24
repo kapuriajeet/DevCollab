@@ -1,259 +1,169 @@
 import UserProfile from "../models/UserProfile.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
-export const getCurrentUserProfile = async (req, res) => {
-  try {
-    const profileId = req.user.profile._id;
-    const userProfile = await UserProfile.findById(profileId).lean();
-    if (!userProfile) {
-      return res.status(404).json({ success: false, message: "User profile not found." });
-    }
-    return res.status(200).json({
-      success: true,
-      message: "User Profile fetched successfully!",
-      userProfile
-    });
-  } catch (error) {
-    console.log(`Error occurred while getting user profile: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while getting user profile.",
-    });
+// Get Logged In User Profile
+export const getCurrentUserProfile = asyncHandler(async (req, res) => {
+  const profileId = req.user.profile._id;
+  const userProfile = await UserProfile.findById(profileId).lean();
+  if (!userProfile) throw new ApiError(404, "User Profile not found");
 
+  return res.status(200).json(new ApiResponse(200, userProfile, "User Profile fetched successfully"));
+});
+
+// Get User Profile by Id
+export const getUserProfile = asyncHandler(async (req, res) => {
+  const profileId = req.params.profileId;
+
+  const userProfile = await UserProfile.findById(profileId);
+
+  if (!userProfile) throw new ApiError(404, "User Profile not found");
+
+  return res.status(200).json(new ApiResponse(200, userProfile, "User Profile fetched successfully"));
+});
+
+// Update User Profile
+export const updateUserProfile = asyncHandler(async (req, res) => {
+  const { username, skills, address, bio, socialLinks } = req.body;
+  const profileId = req.user.profile._id;
+
+  let avatarUrl;
+
+  const avatarLocalPath = req.file?.path;
+  if (avatarLocalPath) {
+    const result = await uploadOnCloudinary(avatarLocalPath, "devcollab/avatar");
+    avatarUrl = result.secure_url;
   }
-};
-export const getUserProfile = async (req, res) => {
-  try {
-    const profileId = req.params.profileId;
 
-    const userProfile = await UserProfile.findById(profileId);
+  let parsedSocialLinks = null;
+  if (!socialLinks) throw new ApiError(400, "Invalid social links format");
+  parsedSocialLinks = JSON.parse(socialLinks);
 
-    if (!userProfile)
-      return res
-        .status(404)
-        .json({ success: false, message: "UserProfile not found" });
+  // Prepare update data
+  const updateData = {
+    ...(username && { username }),
+    ...(skills && {
+      skills: Array.isArray(skills)
+        ? skills
+        : skills.split(",").map((s) => s.trim()),
+    }),
+    ...(address && { address }),
+    ...(bio && { bio }),
+    ...(socialLinks && { socialLinks: parsedSocialLinks }), // handle JSON string from form-data
+    ...(avatarUrl && { avatar: avatarUrl }),
+  };
+  console.log("Update Controller: ", updateData);
 
-    return res.status(200).json({
-      success: true,
-      message: "User profile fetched successfully!",
-      userProfile,
-    });
-  } catch (error) {
-    console.log(`Error occurred while getting user profile: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while getting user profile.",
-    });
+  const updatedProfile = await UserProfile.findByIdAndUpdate(
+    profileId,
+    updateData,
+    { new: true, lean: true }
+  );
+
+  return res.status(200).json(new ApiResponse(200, updatedProfile, "User Profile Updated successfully"));
+});
+
+// Follow a User
+export const followUser = asyncHandler(async (req, res) => {
+  const currentUserProfileId = String(req.user.profile._id);
+  const targetUserProfileId = req.params.profileId;
+
+  console.log("CUPI", currentUserProfileId);
+  console.log("TUPI", targetUserProfileId);
+  if (currentUserProfileId === targetUserProfileId) {
+    throw new ApiError(400, "Cannot follow yourelf");
   }
-};
 
-export const updateUserProfile = async (req, res) => {
-  try {
-    const { username, skills, address, bio, socialLinks } = req.body;
-    const profileId = req.user.profile._id;
+  const alreadyFollowing = await UserProfile.exists({
+    _id: currentUserProfileId,
+    following: targetUserProfileId
+  });
 
-    let avatarUrl;
+  if (alreadyFollowing) {
+    throw new ApiError(400, "Already following the user");
+  }
+  await UserProfile.findByIdAndUpdate(
+    currentUserProfileId,
+    { $addToSet: { following: targetUserProfileId } },
+    { new: true }
+  );
 
-    const avatarLocalPath = req.files?.avatar[0]?.path;
-    if (avatarLocalPath) {
-      const result = await uploadOnCloudinary(avatarLocalPath, "avatar");
-      avatarUrl = result.secure_url;
-    }
+  const updatedProfile = await UserProfile.findByIdAndUpdate(
+    targetUserProfileId,
+    { $addToSet: { followers: currentUserProfileId } },
+    { new: true }
+  );
 
-    let parsedSocialLinks = null;
-    if (socialLinks) {
-      try {
-        parsedSocialLinks = JSON.parse(socialLinks);
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid sociallinks format"
-        });
-      }
-    }
-    // Prepare update data
-    const updateData = {
-      ...(username && { username }),
-      ...(skills && {
-        skills: Array.isArray(skills)
-          ? skills
-          : skills.split(",").map((s) => s.trim()),
-      }),
-      ...(address && { address }),
-      ...(bio && { bio }),
-      ...(socialLinks && { socialLinks: parsedSocialLinks }), // handle JSON string from form-data
-      ...(avatarUrl && { avatar: avatarUrl }),
-    };
-    console.log("Update Controller: ", updateData);
+  return res.status(200).json(new ApiResponse(200, updatedProfile, "User followed successfully"));
+});
 
-    const updatedProfile = await UserProfile.findByIdAndUpdate(
-      profileId,
-      updateData,
-      { new: true, lean: true }
+
+// Unfollow a User
+export const unfollowUser = asyncHandler(async (req, res) => {
+  const currentUserProfileId = String(req.user.profile._id);
+  const targetUserProfileId = req.params.profileId;
+
+  if (currentUserProfileId === targetUserProfileId)
+    throw new ApiError(400, "Cannot unfollow yourself");
+
+  const isFollowing = await UserProfile.exists({
+    _id: currentUserProfileId,
+    following: targetUserProfileId,
+  });
+
+  if (!isFollowing) {
+    throw new ApiError(400, "You are not following this user");
+  }
+  await UserProfile.findByIdAndUpdate(
+    currentUserProfileId,
+    { $pull: { following: targetUserProfileId } },
+    { new: true }
+  );
+
+  const updatedProfile = await UserProfile.findByIdAndUpdate(
+    targetUserProfileId,
+    { $pull: { followers: currentUserProfileId } },
+    { new: true }
+  );
+
+  return res.status(200).json(200, updatedProfile, "User unfollowd successfully");
+});
+
+// Get Followers of a user
+export const getFollowers = asyncHandler(async (req, res) => {
+  const profileId = req.params.profileId;
+
+  const user = await UserProfile.findById(profileId)
+    .populate("followers", "username avatar")
+    .lean();
+
+  if (!user)
+    throw new ApiError(404, "User not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, user.followers, "Got User followers successfully")
     );
+});
 
-    if (!updatedProfile) {
-      return res.status(404).json({ message: "User profile not found" });
-    }
+// Get Followings for a user
+export const getFollowing = asyncHandler(async (req, res) => {
+  const profileId = req.params.profileId;
 
-    res.json({
-      success: true,
-      message: "Profile updated successfully",
-      profile: updatedProfile,
-    });
-  } catch (error) {
-    console.log(`Error occurred while updating user profile: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while updating user profile.",
-      error: error,
-    });
-  }
-};
+  const user = await UserProfile.findById(profileId)
+    .populate("following", "username avatar")
+    .lean();
 
-export const followUser = async (req, res) => {
-  try {
-    const currentUserProfileId = String(req.user.profile._id);
-    const targetUserProfileId = req.params.profileId;
+  if (!user)
+    throw new ApiError(404, "User not found");
 
-    console.log("CUPI", currentUserProfileId);
-    console.log("TUPI", targetUserProfileId);
-    if (currentUserProfileId === targetUserProfileId) {
-      return res.status(400).json({ success: false, message: "Cannot follow yourself" });
-    }
-
-    const alreadyFollowing = await UserProfile.exists({
-      _id: currentUserProfileId,
-      following: targetUserProfileId
-    });
-
-    if (alreadyFollowing) {
-      return res.status(400).json({ success: false, message: "Already following this user." });
-    }
-    await UserProfile.findByIdAndUpdate(
-      currentUserProfileId,
-      { $addToSet: { following: targetUserProfileId } },
-      { new: true }
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, user.following, "User following successfull")
     );
-
-    await UserProfile.findByIdAndUpdate(
-      targetUserProfileId,
-      { $addToSet: { followers: currentUserProfileId } },
-      { new: true }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "User followed successfully.",
-    });
-  } catch (error) {
-    console.log(`Error occurred while following user: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while following user",
-      error: error,
-    });
-  }
-};
-
-export const unfollowUser = async (req, res) => {
-  try {
-    const currentUserProfileId = String(req.user.profile._id);
-    const targetUserProfileId = req.params.profileId;
-
-    if (currentUserProfileId === targetUserProfileId)
-      return res.status(400).json({ success: false, message: "Cannot unfollow yourself" });
-
-    const isFollowing = await UserProfile.exists({
-      _id: currentUserProfileId,
-      following: targetUserProfileId,
-    });
-
-    if (!isFollowing) {
-      return res.status(400).json({
-        success: false,
-        message: "You are not following this user.",
-      });
-    }
-    await UserProfile.findByIdAndUpdate(
-      currentUserProfileId,
-      { $pull: { following: targetUserProfileId } },
-      { new: true }
-    );
-
-    await UserProfile.findByIdAndUpdate(
-      targetUserProfileId,
-      { $pull: { followers: currentUserProfileId } },
-      { new: true }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "User Unfollowed successfully.",
-    });
-  } catch (error) {
-    console.log(`Error occurred while unfollowing user: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while unfollowing user",
-      error: error,
-    });
-  }
-};
-
-export const getFollowers = async (req, res) => {
-  try {
-    const profileId = req.params.profileId;
-
-    const user = await UserProfile.findById(profileId)
-      .populate("followers", "username avatar")
-      .lean();
-
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
-    return res
-      .status(200)
-      .json(
-        { success: true, message: "Getting followers successully", followers: user.followers },
-      );
-  } catch (error) {
-    console.log(`Error occurred while getting followers of a user: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while getting followers of a user",
-      error: error,
-    });
-  }
-};
-
-export const getFollowing = async (req, res) => {
-  try {
-    const profileId = req.params.profileId;
-
-    const user = await UserProfile.findById(profileId)
-      .populate("following", "username avatar")
-      .lean();
-
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
-    return res
-      .status(200)
-      .json(
-        { success: true, message: "Getting following successully", following: user.following },
-      );
-  } catch (error) {
-    console.log(`Error occurred while getting following of a user: ${error}`);
-    return res.status(500).json({
-      success: false,
-      message: "Server error occurred while getting following of a user",
-      error: error,
-    });
-  }
-};
+});
 

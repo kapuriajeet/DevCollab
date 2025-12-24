@@ -15,6 +15,7 @@ const router = express.Router();
 
 // GET Current User profile
 router.get("/me", isAuthenticated, getCurrentUserProfile);
+
 // GET User Profile by Id
 router.get("/:profileId", getUserProfile);
 
@@ -31,7 +32,7 @@ router.patch("/:profileId/follow", isAuthenticated, followUser);
 // UnFollow User
 router.patch("/:profileId/unfollow", isAuthenticated, unfollowUser);
 // Getting Followers List
-router.get('/:profileId/followers', getFollowers);
+router.get('/:profileId/followers', isAuthenticated, getFollowers);
 // Getting Following List
-router.get('/:profileId/following', getFollowing);
+router.get('/:profileId/following', isAuthenticated, getFollowing);
 export default router;

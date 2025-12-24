@@ -154,14 +154,15 @@ export const deleteController = asyncHandler(async (req, res) => {
 });
 
 export const logoutController = asyncHandler(async (req, res) => {
-  const token = req.cookies.refreshToken;
 
-  if (token) {
-    const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-    await User.findByIdAndUpdate(payload.id, { $unset: { refreshToken: 1 } });
-  }
+  await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } });
+
+  const options = {
+    httpOnly: true,
+    secure: true
+  };
   return res.status(200)
-    .clearCookie("refreshToken")
-    .clearCookie("accessToken")
-    .json(new ApiResponse(200, [], "User Logged Out successfully"));
+    .clearCookie("refreshToken", options)
+    .clearCookie("accessToken", options)
+    .json(new ApiResponse(200, {}, "User Logged Out successfully"));
 });
