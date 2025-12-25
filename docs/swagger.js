@@ -13,10 +13,10 @@ const swaggerDefinition = {
       url: "http://localhost:3000",
       description: "Local server",
     },
-    // {
-    //   url: "https://api.devcollab.com/api",
-    //   description: "Production server",
-    // },
+    {
+      url: "https://devcollab-mbxm.onrender.com/",
+      description: "Production server",
+    },
   ],
   components: {
     securitySchemes: {
