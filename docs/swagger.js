@@ -9,10 +9,10 @@ const swaggerDefinition = {
     description: "Backend API documentation for DevCollab",
   },
   servers: [
-    {
-      url: "http://localhost:3000",
-      description: "Local server",
-    },
+    // {
+    //   url: "http://localhost:3000",
+    //   description: "Local server",
+    // },
     {
       url: "https://devcollab-mbxm.onrender.com/",
       description: "Production server",
